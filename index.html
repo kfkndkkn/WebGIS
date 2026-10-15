@@ -2,9 +2,10 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebGIS Kedaruratan Nuklir</title>
   
-  <!-- CSS Leaflet WAJIB DI HEAD -->
+  <!-- CSS Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
@@ -34,16 +35,19 @@
 
   <div id="map"></div>
 
-  <!-- SCRIPT LIBRARY WAJIB SEBELUM SCRIPT UTAMA -->
+  <!-- JS Leaflet & Supabase SDK -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
+    // 1. INSIALISASI SUPABASE (Ganti SUPABASE_ANON_KEY dengan Legacy Anon Key 'eyJ...' kamu)
     const SUPABASE_URL = 'https://kedpmwibkkzvnuhlszeu.supabase.co/rest/v1/';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlZHBtd2lia2t6dm51aGxzemV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5Mjc2NDgsImV4cCI6MjEwNzUwMzY0OH0.AMLnYZmWaoFGcNEK6j19-3cdJgCAJYh_W4dsGhc5gRgv'; // Gunakan Legacy Anon Key (eyJ...)
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlZHBtd2lia2t6dm51aGxzemV1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5Mjc2NDgsImV4cCI6MjEwNzUwMzY0OH0.AMLnYZmWaoFGcNEK6j19-3cdJgCAJYh_W4dsGhc5gRg'; 
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Inisialisasi client Supabase (HANYA SATU KALI)
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // 2. INISIALISASI PETA LEAFLET
     const map = L.map('map').setView([-2.5489, 118.0149], 5);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap'
@@ -51,14 +55,15 @@
 
     const markerGroup = L.layerGroup().addTo(map);
 
+    // 3. FUNGSI LOAD DATA PETA
     async function loadMapData(projectName) {
       markerGroup.clearLayers();
-      const { data, error } = await supabase.rpc('get_map_data', {
+      const { data, error } = await supabaseClient.rpc('get_map_data', {
         target_project: projectName
       });
 
       if (error) {
-        console.error('Error:', error);
+        console.error('Error mengambil data:', error);
         return;
       }
 
@@ -69,11 +74,12 @@
       });
     }
 
+    // 4. FUNGSI LOGIN ADMIN
     async function loginAdmin() {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
         email: email,
         password: password
       });
@@ -86,14 +92,16 @@
       }
     }
 
+    // 5. FUNGSI LOGOUT
     async function logoutAdmin() {
-      await supabase.auth.signOut();
+      await supabaseClient.auth.signOut();
       alert('Logout Berhasil!');
       checkSession();
     }
 
+    // 6. FUNGSI CEK SESSION
     async function checkSession() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabaseClient.auth.getSession();
       const statusText = document.getElementById('status-text');
 
       if (session) {
@@ -112,6 +120,7 @@
       loadMapData('Kedaruratan Nuklir');
     }
 
+    // Jalankan pengecekan session saat halaman dimuat
     checkSession();
   </script>
 </body>
