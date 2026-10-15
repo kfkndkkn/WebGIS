@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebGIS Kedaruratan & Kesiapsiagaan Nuklir</title>
+  
+  <!-- CSS Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #map { height: 500px; width: 100%; border-radius: 8px; }
+    .panel { background: #f4f4f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+    .status-admin { color: green; font-weight: bold; }
+    .status-public { color: #555; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <h2>Peta Kedaruratan Nuklir Nasional</h2>
+
+  <!-- Panel Login & Status User -->
+  <div class="panel">
+    <div id="login-form">
+      <input type="email" id="email" placeholder="Email Admin">
+      <input type="password" id="password" placeholder="Password">
+      <button onclick="loginAdmin()">Login Admin</button>
+    </div>
+
+    <div id="logged-in-info" style="display: none;">
+      <span id="user-email"></span>
+      <button onclick="logoutAdmin()">Logout</button>
+    </div>
+
+    <p>Mode Akses Saat Ini: <span id="status-text" class="status-public">Publik (Ibu Kota Provinsi)</span></p>
+  </div>
+
+  <!-- Container Peta Leaflet -->
+  <div id="map"></div>
+
+  <!-- Library Leaflet & Supabase SDK -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    // 1. INSIALISASI SUPABASE (Ganti dengan API Key Supabase Kamu)
+    const SUPABASE_URL = 'https://kedpmwibkkzvnuhlszeu.supabase.co/rest/v1/';
+    const SUPABASE_ANON_KEY = 'sb_publishable_eCR4WRcS_3hETylWm_2cuw_KpG3Me3y';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 2. INISIALISASI PETA LEAFLET
+    const map = L.map('map').setView([-2.5489, 118.0149], 5); // Center Indonesia
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    const markerGroup = L.layerGroup().addTo(map);
+
+    // 3. FUNGSI TARIK DATA DARI SUPABASE
+    async function loadMapData(projectName) {
+      markerGroup.clearLayers();
+
+      // Memanggil Postgres Function (get_map_data)
+      const { data, error } = await supabase.rpc('get_map_data', {
+        target_project: projectName
+      });
+
+      if (error) {
+        console.error('Error mengambil data:', error);
+        return;
+      }
+
+      // Plot Marker ke Peta
+      data.forEach(item => {
+        L.marker([item.lat, item.lng])
+          .bindPopup(`<b>${item.project_name}</b><br>${item.description}`)
+          .addTo(markerGroup);
+      });
+    }
+
+    // 4. FUNGSI LOGIN ADMIN
+    async function loginAdmin() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+      if (error) {
+        alert('Login Gagal: ' + error.message);
+      } else {
+        alert('Login Berhasil! Mengunduh data Exact Location...');
+        checkSession();
+      }
+    }
+
+    // 5. FUNGSI LOGOUT
+    async function logoutAdmin() {
+      await supabase.auth.signOut();
+      alert('Berhasil Logout. Kembali ke Mode Publik.');
+      checkSession();
+    }
+
+    // 6. PENGECEKAN SESSION USER
+    async function checkSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const statusText = document.getElementById('status-text');
+
+      if (session) {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('logged-in-info').style.display = 'block';
+        document.getElementById('user-email').innerText = 'Logged in: ' + session.user.email + ' ';
+        statusText.innerText = 'Admin (Exact Location Data)';
+        statusText.className = 'status-admin';
+      } else {
+        document.getElementById('login-form').style.display = 'block';
+        document.getElementById('logged-in-info').style.display = 'none';
+        statusText.innerText = 'Publik (Ibu Kota Provinsi)';
+        statusText.className = 'status-public';
+      }
+
+      // Reload Data Peta setelah status login berubah
+      loadMapData('Kedaruratan Nuklir');
+    }
+
+    // Jalankan pengecekan status saat halaman pertama kali dibuka
+    checkSession();
+  </script>
+</body>
+</html>
